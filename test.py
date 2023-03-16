@@ -75,7 +75,10 @@ def main():
     train_data = TensorDataset(torch.tensor(X_train, dtype=torch.float), torch.tensor(y_train, dtype=torch.float))
     train_loader = DataLoader(train_data, batch_size=32, shuffle=True)
 
-    num_epochs = 1
+    # Add a variable to track the best loss value during training
+    best_loss = float('inf')
+
+    num_epochs = 10
     for epoch in range(num_epochs):
         for inputs, targets in train_loader:
             optimizer.zero_grad()
@@ -83,20 +86,28 @@ def main():
             loss = criterion(outputs, targets.view(-1, 1))
             loss.backward()
             optimizer.step()
+
+        # Save the model whenever the loss value improves
+        if loss.item() < best_loss:
+            best_loss = loss.item()
+            torch.save(model.state_dict(), 'best_model.pt')
         print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss.item()}")
+
+    # Load the saved model in subsequent runs
+    saved_model = LSTMModel(input_dim, hidden_dim, num_layers, output_dim)
+    saved_model.load_state_dict(torch.load('best_model.pt'))
+    saved_model.eval()
 
     X_test_tensor = torch.tensor(X_test, dtype=torch.float)
 
-    # Evaluating the model
-    model.eval()
+    # Replace 'model' with 'saved_model' for evaluation and prediction
     with torch.no_grad():
-        y_test_pred = model(X_test_tensor)
+        y_test_pred = saved_model(X_test_tensor)
 
     y_test_pred = y_test_pred.detach().numpy()
     y_test = y_test.reshape(-1, 1)
     y_test_pred = close_scaler.inverse_transform(y_test_pred.reshape(-1, 1)).reshape(-1)
     y_test_actual = close_scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(-1)
-
     # Calculate the difference between predicted and actual prices
     diff = y_test_pred[:-1] - y_test_actual[1:]
 
